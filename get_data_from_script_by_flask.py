@@ -1,7 +1,9 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 import sqlite3
 import requests
 import logging
+from datetime import datetime
+import pytz
 
 
 logger = logging.getLogger()
@@ -36,7 +38,7 @@ def send_data_to_django():
         logger.info(f"Data sent to django app successfully!")
         return True
     else:
-        logger.error(f"Failed to send data data to django app. Response: {response.content}")
+        logger.error(f"Failed to send data to django app. Response: {response.content}")
         return False
 
 @app.route('/send_data', methods=['GET','POST'])
@@ -47,8 +49,40 @@ def send_data_to_django_web():
     else:
         return jsonify({"error": "Failed to send data to django app."}), 500
 
+
+@app.route('/receive_data/', methods=['GET','POST'])
+def receive_data():
+    try:
+        data = request.json
+        database_ids = data['django_database_id_data']
+        tokens = data['django_token_data']
+
+        # Connect to SQLite database
+        conn = sqlite3.connect('time_tracking.db')
+        cursor = conn.cursor()
+
+        # Get current time in GMT-3
+        sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
+        current_time = datetime.now(sao_paulo_tz)
+
+        # Insert data into SQLite tables
+        for item in database_ids:
+            cursor.execute("INSERT OR IGNORE INTO database_id (database_id, description, created_at) VALUES (?, ?, ?)",
+                           (item['database_id'], item['description'], current_time))
+
+        for item in tokens:
+            cursor.execute("INSERT OR IGNORE INTO token (token_id, description, created_at) VALUES (?, ?, ?)",
+                           (item['token_id'], item['description'], current_time))
+
+        # Commit changes and close connection
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Data received by script successfully!"})
+
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(port=5000)
-
-
-
