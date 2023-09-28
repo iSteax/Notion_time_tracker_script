@@ -40,14 +40,16 @@ CREATE TABLE IF NOT EXISTS tracking (
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS token (
     token_id TEXT PRIMARY KEY,
-    description TEXT
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS database_id (
     database_id TEXT PRIMARY KEY,
-    description TEXT
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ''')
 
