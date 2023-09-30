@@ -5,7 +5,7 @@ import time
 import json
 import logging
 from logging.handlers import RotatingFileHandler
-from get_data_from_script_by_flask import send_data_to_django
+from send_data_from_script_to_django_app import send_data_to_django
 from config import database_id, TOKEN
 
 
