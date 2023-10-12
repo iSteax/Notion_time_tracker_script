@@ -75,9 +75,9 @@ def get_token():
 def get_database_ids():
     conn = sqlite3.connect('time_tracking.db')
     cursor = conn.cursor()
-    db_ids = cursor.execute("SELECT database_id FROM database_id").fetchall()
+    db_data = cursor.execute("SELECT database_id, description FROM database_id").fetchall()
     conn.close()
-    return {db_id[0]: "Description not available" for db_id in db_ids}
+    return {entry[0]: entry[1] if entry[1] else "Description not available" for entry in db_data}
 
 TOKEN = get_token()
 database_id = get_database_ids()
@@ -279,9 +279,19 @@ def convert_iso_to_standard_format(iso_time_str):
     dt = datetime.fromisoformat(iso_time_str)
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
+def refresh_database_id_values():
+    global database_id
+
+    # Refresh database_id from SQLite database
+    database_id = get_database_ids()
 
 def fetch_data_from_notion():
-    fetched_task_ids = set()  # This set will store the IDs of tasks fetched from Notion whose status is not "Done"
+    # Refresh TOKEN and database_id from SQLite
+    refresh_database_id_values()
+
+    logger.info(f"database_id_fetch_from_notion: {database_id}")
+
+    fetched_task_ids = set()                                                                                    # This set will store the IDs of tasks fetched from Notion whose status is not "Done"
 
     for db_id, db_name in database_id.items():
         logging.info(f"Fetching data from database: {db_name}")
