@@ -7,6 +7,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from send_data_from_script_to_django_app import send_data_to_django
 from config import database_id, TOKEN
+from SQliteDB_class import SQLiteDB
 
 
 logger = logging.getLogger()
@@ -18,12 +19,11 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-# SQLite setup
-conn = sqlite3.connect('time_tracking.db')
-cursor = conn.cursor()
+# Instantiate the SQLiteDB for further usage
+db = SQLiteDB('time_tracking.db')
 
 # Create table if not exists for main data
-cursor.execute('''
+db.execute('''
 CREATE TABLE IF NOT EXISTS tracking (
     task_id TEXT PRIMARY KEY,
     task_name TEXT,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS tracking (
 ''')
 
 # Create table for token and database_id
-cursor.execute('''
+db.execute('''
 CREATE TABLE IF NOT EXISTS token (
     token_id TEXT PRIMARY KEY,
     description TEXT,
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS token (
 )
 ''')
 
-cursor.execute('''
+db.execute('''
 CREATE TABLE IF NOT EXISTS database_id (
     database_id TEXT PRIMARY KEY,
     description TEXT,
@@ -55,29 +55,23 @@ CREATE TABLE IF NOT EXISTS database_id (
 
 # Insert TOKEN data
 for token_id, description in TOKEN.items():
-    cursor.execute("INSERT OR IGNORE INTO token (token_id, description) VALUES (?, ?)", (token_id, description))
+    db.execute("INSERT OR IGNORE INTO token (token_id, description) VALUES (?, ?)", (token_id, description))
 
 # Insert database_id data
 for db_id, description in database_id.items():
-    cursor.execute("INSERT OR IGNORE INTO database_id (database_id, description) VALUES (?, ?)", (db_id, description))
+    db.execute("INSERT OR IGNORE INTO database_id (database_id, description) VALUES (?, ?)", (db_id, description))
 
-conn.commit()
 
 #get token and database_id from the table
 
 def get_token():
-    conn = sqlite3.connect('time_tracking.db')
-    cursor = conn.cursor()
-    token_value = cursor.execute("SELECT token_id FROM token").fetchone()
-    conn.close()
+    token_value = db.fetch_one("SELECT token_id FROM token")
     return token_value[0] if token_value else None
 
 def get_database_ids():
-    conn = sqlite3.connect('time_tracking.db')
-    cursor = conn.cursor()
-    db_data = cursor.execute("SELECT database_id, description FROM database_id").fetchall()
-    conn.close()
+    db_data = db.fetch_all("SELECT database_id, description FROM database_id")
     return {entry[0]: entry[1] if entry[1] else "Description not available" for entry in db_data}
+
 
 TOKEN = get_token()
 database_id = get_database_ids()
@@ -122,14 +116,14 @@ def clear_priority_in_notion(task_id):
 
 
 def load_tasks_status_from_db():
-    global in_progress_tasks, paused_tasks
+    global in_progress_tasks, paused_tasks, db
 
     # Fetch tasks with "In progress" status
-    in_progress_from_db = cursor.execute("SELECT task_id FROM tracking WHERE status=?", ("In progress",)).fetchall()
+    in_progress_from_db = db.fetch_all("SELECT task_id FROM tracking WHERE status=?", ("In progress",))
     in_progress_tasks = {task[0] for task in in_progress_from_db}
 
     # Fetch tasks with "Paused" status
-    paused_from_db = cursor.execute("SELECT task_id FROM tracking WHERE status=?", ("Paused",)).fetchall()
+    paused_from_db = db.fetch_all("SELECT task_id FROM tracking WHERE status=?", ("Paused",))
     paused_tasks = {task[0] for task in paused_from_db}
 
 
@@ -180,7 +174,7 @@ def calculate_elapsed_time(start_time_str, paused_time_str):
 
 def update_or_insert_task(task_id, task_name, status):
     """Insert or update a task in the SQLite database."""
-    existing_task = cursor.execute("SELECT status FROM tracking WHERE task_id=?", (task_id,)).fetchone()
+    existing_task = db.fetch_one("SELECT status FROM tracking WHERE task_id=?", (task_id,))
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     previous_status = existing_task[0] if existing_task else None
@@ -190,52 +184,41 @@ def update_or_insert_task(task_id, task_name, status):
         return
 
     if status == "In progress" and task_id not in in_progress_tasks:
-        start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        if existing_task:  # If the task already exists in the database
-            cursor.execute("UPDATE tracking SET status=?, start_time=?, task_name=? WHERE task_id=?",
-                           (status, start_time, task_name, task_id))
-        else:  # If it's a new task
-            cursor.execute("INSERT INTO tracking (task_id, task_name, status, start_time) VALUES (?, ?, ?, ?)",
-                           (task_id, task_name, status, start_time))
+        start_time = now
+        if existing_task:
+            db.execute("UPDATE tracking SET status=?, start_time=?, task_name=? WHERE task_id=?",
+                             (status, start_time, task_name, task_id))
+        else:
+            db.execute("INSERT INTO tracking (task_id, task_name, status, start_time) VALUES (?, ?, ?, ?)",
+                             (task_id, task_name, status, start_time))
         update_task_in_notion(task_id, "Start time", start_time, value_type="date")
         in_progress_tasks.add(task_id)
         if task_id in paused_tasks:
             paused_tasks.remove(task_id)
 
     elif status == "Paused" and task_id not in paused_tasks:
-        result = cursor.execute("SELECT start_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()
-        if result:
-            start_time_str, previous_elapsed_time_str = result
-        else:
-            start_time_str, previous_elapsed_time_str = None, None
-
+        result = db.fetch_one("SELECT start_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,))
+        start_time_str, previous_elapsed_time_str = result if result else (None, None)
         if start_time_str:
             current_elapsed_time = calculate_elapsed_time(start_time_str, now)
-            logging.info(f"Current Elapsed Time: {current_elapsed_time}")  # Debugging line
             if previous_elapsed_time_str:
                 previous_elapsed_time = hms_str_to_timedelta(previous_elapsed_time_str)
-                logging.info(f"Previous Elapsed Time: {previous_elapsed_time}")  # Debugging line
                 total_elapsed_time = previous_elapsed_time + current_elapsed_time
             else:
                 total_elapsed_time = current_elapsed_time
             elapsed_time_str = timedelta_to_hms_str(total_elapsed_time)
-            logging.info(f"Total Elapsed Time: {elapsed_time_str}")  # Debugging line
-            cursor.execute("UPDATE tracking SET status=?, paused_time=?, elapsed_time=?, task_name=? WHERE task_id=?",
-                           (status, now, elapsed_time_str, task_name, task_id))
+            db.execute("UPDATE tracking SET status=?, paused_time=?, elapsed_time=?, task_name=? WHERE task_id=?",
+                             (status, now, elapsed_time_str, task_name, task_id))
             update_task_in_notion(task_id, "Elapsed time", elapsed_time_str, value_type="text")
             update_task_in_notion(task_id, "Paused time", now, value_type="date")
             if task_id in in_progress_tasks:
                 in_progress_tasks.remove(task_id)
             paused_tasks.add(task_id)
 
-    elif status == "Done" and task_id in in_progress_tasks:
-        if existing_task:
-            cursor.execute("UPDATE tracking SET status=?, done_time=? WHERE task_id=?", (status, now, task_id))
-        else:
-            cursor.execute("INSERT INTO tracking (task_id, status, done_time) VALUES (?, ?, ?)", (task_id, status, now))
-        start_time_str, previous_elapsed_time_str = cursor.execute(
-            "SELECT start_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()
-        if start_time_str:
+    elif status == "Done":
+        if task_id in in_progress_tasks:
+            start_time_str, previous_elapsed_time_str = db.fetch_one(
+                "SELECT start_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,))
             current_elapsed_time = calculate_elapsed_time(start_time_str, now)
             if previous_elapsed_time_str:
                 previous_elapsed_time = hms_str_to_timedelta(previous_elapsed_time_str)
@@ -243,34 +226,28 @@ def update_or_insert_task(task_id, task_name, status):
             else:
                 total_elapsed_time = current_elapsed_time
             elapsed_time_str = timedelta_to_hms_str(total_elapsed_time)
-            cursor.execute("UPDATE tracking SET status=?, done_time=?, elapsed_time=?, task_name=? WHERE task_id=?",
-                           (status, now, elapsed_time_str, task_name, task_id))
+            db.execute("UPDATE tracking SET status=?, done_time=?, elapsed_time=?, task_name=? WHERE task_id=?",
+                             (status, now, elapsed_time_str, task_name, task_id))
             update_task_in_notion(task_id, "Elapsed time", elapsed_time_str, value_type="text")
             update_task_in_notion(task_id, "Done time", now, value_type="date")
-            if task_id in in_progress_tasks:
-                in_progress_tasks.remove(task_id)
-        clear_priority_in_notion(task_id)
+            in_progress_tasks.remove(task_id)
+            clear_priority_in_notion(task_id)
 
-    elif status == "Done" and task_id in paused_tasks:
-        paused_time = cursor.execute("SELECT paused_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()[0]
-        if existing_task:
-            cursor.execute("UPDATE tracking SET status=?, done_time=?, task_name=? WHERE task_id=?",
-                           (status, paused_time, task_name, task_id))
-        else:
-            cursor.execute("INSERT INTO tracking (task_id, status, done_time) VALUES (?, ?, ?)",
-                           (task_id, status, paused_time))
-        update_task_in_notion(task_id, "Done time", paused_time, value_type="date")
-        if task_id in paused_tasks:
+        elif task_id in paused_tasks:
+            paused_time = db.fetch_one("SELECT paused_time FROM tracking WHERE task_id=?", (task_id,))[0]
+            db.execute("UPDATE tracking SET status=?, done_time=?, task_name=? WHERE task_id=?",
+                             (status, paused_time, task_name, task_id))
+            update_task_in_notion(task_id, "Done time", paused_time, value_type="date")
             paused_tasks.remove(task_id)
-        clear_priority_in_notion(task_id)
+            clear_priority_in_notion(task_id)
 
     else:
         if existing_task:
-            cursor.execute("UPDATE tracking SET status=?, task_name=? WHERE task_id=?", (status, task_name, task_id))
+            db.execute("UPDATE tracking SET status=?, task_name=? WHERE task_id=?",
+                             (status, task_name, task_id))
         else:
-            cursor.execute("INSERT INTO tracking (task_id, task_name, status) VALUES (?, ?, ?)",
-                           (task_id, task_name, status))
-    conn.commit()
+            db.execute("INSERT INTO tracking (task_id, task_name, status) VALUES (?, ?, ?)",
+                             (task_id, task_name, status))
 
     send_data_to_django()
 
@@ -291,15 +268,14 @@ def fetch_data_from_notion():
 
     logger.info(f"database_id_fetch_from_notion: {database_id}")
 
-    fetched_task_ids = set()                                                                                    # This set will store the IDs of tasks fetched from Notion whose status is not "Done"
+    fetched_task_ids = set()  # This set will store the IDs of tasks fetched from Notion whose status is not "Done"
 
     for db_id, db_name in database_id.items():
         logging.info(f"Fetching data from database: {db_name}")
         tasks = client.databases.query(database_id=db_id)["results"]
 
         for task in tasks:
-            task_name = task["properties"]["Name"]["title"][0]["text"]["content"] if task["properties"]["Name"][
-                "title"] else None
+            task_name = task["properties"]["Name"]["title"][0]["text"]["content"] if task["properties"]["Name"]["title"] else None
             task_id = task["id"]
 
             # Retrieve the status from the Notion task
@@ -308,9 +284,7 @@ def fetch_data_from_notion():
 
             if task_id and status:
                 # Check if the time-related fields in Notion differ from those in the SQLite database
-                existing_task = cursor.execute(
-                    "SELECT start_time, paused_time, done_time, elapsed_time FROM tracking WHERE task_id=?",
-                    (task_id,)).fetchone()
+                existing_task = db.fetch_one("SELECT start_time, paused_time, done_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,))
 
                 if existing_task:
                     db_start_time, db_paused_time, db_done_time, db_elapsed_time = existing_task
@@ -339,13 +313,11 @@ def fetch_data_from_notion():
 
                     # Update the SQLite database if any of the fields have changed
                     if start_time != db_start_time or paused_time != db_paused_time or done_time != db_done_time or elapsed_time != db_elapsed_time:
-                        cursor.execute(
-                            "UPDATE tracking SET start_time=?, paused_time=?, done_time=?, elapsed_time=? WHERE task_id=?",
+                        db.execute("UPDATE tracking SET start_time=?, paused_time=?, done_time=?, elapsed_time=? WHERE task_id=?",
                             (start_time, paused_time, done_time, elapsed_time, task_id))
-                        conn.commit()
 
                 # Insert or update the task in SQLite using the function
-                update_or_insert_task(task_id, task_name, status)
+                update_or_insert_task(task_id, task_name, status)  # Assuming this function will also be updated to use the SQLiteDB class
 
                 # Only add the task ID to the set if its status is not "Done"
                 if status != "Done":
@@ -357,7 +329,7 @@ def fetch_data_from_notion():
 
 
 def main():
-    global in_progress_tasks, paused_tasks
+    global in_progress_tasks, paused_tasks, db
 
     print("Time_tracker run successfully")
 
@@ -370,7 +342,7 @@ def main():
             fetched_task_ids = fetch_data_from_notion()
 
             # Get all task IDs from the SQLite database
-            all_db_task_ids = {task[0] for task in cursor.execute("SELECT task_id FROM tracking").fetchall()}
+            all_db_task_ids = {task[0] for task in db.fetch_all("SELECT task_id FROM tracking")}
 
             # Find tasks that are in the SQLite database but not in the fetched tasks from Notion
             deleted_task_ids = all_db_task_ids - fetched_task_ids
@@ -393,3 +365,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -1,22 +1,20 @@
 from flask import Flask, jsonify, request
-import sqlite3
 import requests
 import logging
-from datetime import datetime
-import pytz
-
+from SQliteDB_class import SQLiteDB
 
 logger = logging.getLogger()
 
 app = Flask(__name__)
 
+# Instantiate the SQLiteDB for further usage
+db = SQLiteDB('time_tracking.db')
+
 def send_data_to_django():
-    conn = sqlite3.connect('time_tracking.db')
-    cursor = conn.cursor()
-    tracking_data = cursor.execute("SELECT * FROM tracking").fetchall()
-    token_data = cursor.execute("SELECT * FROM token").fetchall()
-    database_id_data = cursor.execute("SELECT * FROM database_id").fetchall()
-    conn.close()
+    # Fetching data using the SQLiteDB class
+    tracking_data = db.fetch_all("SELECT * FROM tracking")
+    token_data = db.fetch_all("SELECT * FROM token")
+    database_id_data = db.fetch_all("SELECT * FROM database_id")
 
     payload = {
         'tracking_data': tracking_data,
@@ -33,7 +31,6 @@ def send_data_to_django():
     message = response_data.get('message', response_data.get('error', 'Unknown response'))
     logger.info(message)
 
-
     if response.status_code == 200:
         logger.info(f"Data sent to django app successfully!")
         return True
@@ -48,7 +45,6 @@ def send_data_to_django_web():
         return jsonify({"message": "Data sent to django app successfully!"}), 200
     else:
         return jsonify({"error": "Failed to send data to django app."}), 500
-
 
 if __name__ == '__main__':
     app.run(port=5000)
