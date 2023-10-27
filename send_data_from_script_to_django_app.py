@@ -2,24 +2,30 @@ from flask import Flask, jsonify, request
 import requests
 import logging
 from SQliteDB_class import SQLiteDB
+import os
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'time_tracking.db')
 
 logger = logging.getLogger()
 
 app = Flask(__name__)
 
 # Instantiate the SQLiteDB for further usage
-db = SQLiteDB('time_tracking.db')
+db = SQLiteDB(DB_PATH)
 
 def send_data_to_django():
-    # Fetching data using the SQLiteDB class
-    tracking_data = db.fetch_all("SELECT * FROM tracking")
-    token_data = db.fetch_all("SELECT * FROM token")
-    database_id_data = db.fetch_all("SELECT * FROM database_id")
+    # Using the SQLiteDB class within a 'with' statement
+    with SQLiteDB(DB_PATH) as db:
+        tracking_data = db.fetch_all("SELECT * FROM tracking")
+        token_data = db.fetch_all("SELECT * FROM token")
+        database_id_data = db.fetch_all("SELECT * FROM database_id")
 
     payload = {
         'tracking_data': tracking_data,
         'token_data': token_data,
-        'database_id_data':database_id_data,
+        'database_id_data': database_id_data,
     }
 
     # Send data to Django app
