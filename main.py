@@ -54,14 +54,14 @@ CREATE TABLE IF NOT EXISTS database_id (
 ''')
 
 # Insert TOKEN data
-for token_id, description in TOKEN.items():
-    cursor.execute("INSERT OR IGNORE INTO token (token_id, description) VALUES (?, ?)", (token_id, description))
-
-# Insert database_id data
-for db_id, description in database_id.items():
-    cursor.execute("INSERT OR IGNORE INTO database_id (database_id, description) VALUES (?, ?)", (db_id, description))
-
-conn.commit()
+# for token_id, description in TOKEN.items():
+#     cursor.execute("INSERT OR IGNORE INTO token (token_id, description) VALUES (?, ?)", (token_id, description))
+#
+# # Insert database_id data
+# for db_id, description in database_id.items():
+#     cursor.execute("INSERT OR IGNORE INTO database_id (database_id, description) VALUES (?, ?)", (db_id, description))
+#
+# conn.commit()
 
 #get token and database_id from the table
 
@@ -201,6 +201,7 @@ def update_or_insert_task(task_id, task_name, status):
         in_progress_tasks.add(task_id)
         if task_id in paused_tasks:
             paused_tasks.remove(task_id)
+        send_data_to_django()
 
     elif status == "Paused" and task_id not in paused_tasks:
         result = cursor.execute("SELECT start_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()
@@ -227,6 +228,7 @@ def update_or_insert_task(task_id, task_name, status):
             if task_id in in_progress_tasks:
                 in_progress_tasks.remove(task_id)
             paused_tasks.add(task_id)
+        send_data_to_django()
 
     elif status == "Done" and task_id in in_progress_tasks:
         if existing_task:
@@ -250,6 +252,7 @@ def update_or_insert_task(task_id, task_name, status):
             if task_id in in_progress_tasks:
                 in_progress_tasks.remove(task_id)
         clear_priority_in_notion(task_id)
+        send_data_to_django()
 
     elif status == "Done" and task_id in paused_tasks:
         paused_time = cursor.execute("SELECT paused_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()[0]
@@ -263,6 +266,7 @@ def update_or_insert_task(task_id, task_name, status):
         if task_id in paused_tasks:
             paused_tasks.remove(task_id)
         clear_priority_in_notion(task_id)
+        send_data_to_django()
 
     else:
         if existing_task:
@@ -270,9 +274,10 @@ def update_or_insert_task(task_id, task_name, status):
         else:
             cursor.execute("INSERT INTO tracking (task_id, task_name, status) VALUES (?, ?, ?)",
                            (task_id, task_name, status))
+        send_data_to_django()
     conn.commit()
 
-    send_data_to_django()
+    # send_data_to_django()
 
 
 def convert_iso_to_standard_format(iso_time_str):
