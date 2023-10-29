@@ -6,7 +6,8 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 from send_data_from_script_to_django_app import send_data_to_django
-from config import database_id, TOKEN
+# from config import database_id, TOKEN
+import pytz
 
 
 logger = logging.getLogger()
@@ -143,7 +144,7 @@ def update_task_in_notion(task_id, column_name, value, value_type="date"):
                     "type": "date",
                     "date": {
                         "start": value,
-                        "time_zone": "America/Sao_Paulo"
+                        # "time_zone": "America/Sao_Paulo"
                     }
                 }
             }
