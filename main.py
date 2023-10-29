@@ -5,9 +5,12 @@ import time
 import json
 import logging
 from logging.handlers import RotatingFileHandler
+from convert_utilites import calculate_elapsed_time, hms_str_to_timedelta, timedelta_to_hms_str, \
+    convert_iso_to_standard_format
+from get_token_database_id import TOKEN, database_id, get_database_ids
 from send_data_from_script_to_django_app import send_data_to_django
-# from config import database_id, TOKEN
-import pytz
+from tasks_utilites import update_task_in_notion, clear_priority_in_notion, load_tasks_status_from_db
+
 
 
 logger = logging.getLogger()
@@ -66,117 +69,117 @@ CREATE TABLE IF NOT EXISTS database_id (
 
 #get token and database_id from the table
 
-def get_token():
-    conn = sqlite3.connect('time_tracking.db')
-    cursor = conn.cursor()
-    token_value = cursor.execute("SELECT token_id FROM token").fetchone()
-    conn.close()
-    return token_value[0] if token_value else None
-
-def get_database_ids():
-    conn = sqlite3.connect('time_tracking.db')
-    cursor = conn.cursor()
-    db_data = cursor.execute("SELECT database_id, description FROM database_id").fetchall()
-    conn.close()
-    return {entry[0]: entry[1] if entry[1] else "Description not available" for entry in db_data}
-
-TOKEN = get_token()
-database_id = get_database_ids()
-
-logger.info(f"TOKEN: {TOKEN}")
-logger.info(f"database_id: {database_id}")
+# def get_token():
+#     conn = sqlite3.connect('time_tracking.db')
+#     cursor = conn.cursor()
+#     token_value = cursor.execute("SELECT token_id FROM token").fetchone()
+#     conn.close()
+#     return token_value[0] if token_value else None
+#
+# def get_database_ids():
+#     conn = sqlite3.connect('time_tracking.db')
+#     cursor = conn.cursor()
+#     db_data = cursor.execute("SELECT database_id, description FROM database_id").fetchall()
+#     conn.close()
+#     return {entry[0]: entry[1] if entry[1] else "Description not available" for entry in db_data}
+#
+# TOKEN = get_token()
+# database_id = get_database_ids()
+#
+# logger.info(f"TOKEN: {TOKEN}")
+# logger.info(f"database_id: {database_id}")
 
 # Notion connect
 client = Client(auth=TOKEN)
 
-def timedelta_to_hms_str(td):
-    hours, remainder = divmod(td.total_seconds(), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return "{:02}:{:02}:{:02}".format(int(hours), int(minutes), int(seconds))
+# def timedelta_to_hms_str(td):
+#     hours, remainder = divmod(td.total_seconds(), 3600)
+#     minutes, seconds = divmod(remainder, 60)
+#     return "{:02}:{:02}:{:02}".format(int(hours), int(minutes), int(seconds))
+#
+#
+# def hms_str_to_timedelta(hms_str):
+#     parts = list(map(int, hms_str.split(':')))
+#     if len(parts) == 3:
+#         hours, minutes, seconds = parts
+#     elif len(parts) == 2:
+#         hours, minutes = parts
+#         seconds = 0
+#     else:
+#         raise ValueError(f"Invalid format for hms_str: {hms_str}")
+#     return timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
 
-def hms_str_to_timedelta(hms_str):
-    parts = list(map(int, hms_str.split(':')))
-    if len(parts) == 3:
-        hours, minutes, seconds = parts
-    elif len(parts) == 2:
-        hours, minutes = parts
-        seconds = 0
-    else:
-        raise ValueError(f"Invalid format for hms_str: {hms_str}")
-    return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+# def clear_priority_in_notion(task_id):
+#     try:
+#         logging.info(f"Attempting to clear 'Priority' for task '{task_id}' in Notion")
+#
+#         properties = {
+#             "Priority": None  # Clearing the Priority column
+#         }
+#
+#         response = client.pages.update(page_id=task_id, properties=properties)
+#         logging.info(f"Response from Notion API: {response}")
+#         logging.info(f"Cleared 'Priority' for task '{task_id}' in Notion")
+#     except Exception as e:
+#         logging.error(f"Error clearing 'Priority' for task '{task_id}' in Notion", exc_info=True)
 
 
-def clear_priority_in_notion(task_id):
-    try:
-        logging.info(f"Attempting to clear 'Priority' for task '{task_id}' in Notion")
-
-        properties = {
-            "Priority": None  # Clearing the Priority column
-        }
-
-        response = client.pages.update(page_id=task_id, properties=properties)
-        logging.info(f"Response from Notion API: {response}")
-        logging.info(f"Cleared 'Priority' for task '{task_id}' in Notion")
-    except Exception as e:
-        logging.error(f"Error clearing 'Priority' for task '{task_id}' in Notion", exc_info=True)
+# def load_tasks_status_from_db():
+#     global in_progress_tasks, paused_tasks
+#
+#     # Fetch tasks with "In progress" status
+#     in_progress_from_db = cursor.execute("SELECT task_id FROM tracking WHERE status=?", ("In progress",)).fetchall()
+#     in_progress_tasks = {task[0] for task in in_progress_from_db}
+#
+#     # Fetch tasks with "Paused" status
+#     paused_from_db = cursor.execute("SELECT task_id FROM tracking WHERE status=?", ("Paused",)).fetchall()
+#     paused_tasks = {task[0] for task in paused_from_db}
 
 
-def load_tasks_status_from_db():
-    global in_progress_tasks, paused_tasks
-
-    # Fetch tasks with "In progress" status
-    in_progress_from_db = cursor.execute("SELECT task_id FROM tracking WHERE status=?", ("In progress",)).fetchall()
-    in_progress_tasks = {task[0] for task in in_progress_from_db}
-
-    # Fetch tasks with "Paused" status
-    paused_from_db = cursor.execute("SELECT task_id FROM tracking WHERE status=?", ("Paused",)).fetchall()
-    paused_tasks = {task[0] for task in paused_from_db}
-
-
-def update_task_in_notion(task_id, column_name, value, value_type="date"):
-    try:
-        logging.info(f"Attempting to update task '{task_id}' in Notion: {column_name} = {value}")
-
-        if value_type == "date":
-            properties = {
-                column_name: {
-                    "type": "date",
-                    "date": {
-                        "start": value,
-                        # "time_zone": "America/Sao_Paulo"
-                    }
-                }
-            }
-        elif value_type == "text":
-            properties = {
-                column_name: {
-                    "type": "rich_text",
-                    "rich_text": [{"type": "text", "text": {"content": value}}]
-                }
-            }
-        else:
-            raise ValueError(f"Unsupported value type: {value_type}")
-
-        response = client.pages.update(page_id=task_id, properties=properties)
-        logging.info(f"Response from Notion API: {response}")
-        logging.info(f"Updated task '{task_id}' in Notion: {column_name} = {value}")
-    except Exception as e:
-        logging.error(f"Error updating task '{task_id}' in Notion", exc_info=True)
+# def update_task_in_notion(task_id, column_name, value, value_type="date"):
+#     try:
+#         logging.info(f"Attempting to update task '{task_id}' in Notion: {column_name} = {value}")
+#
+#         if value_type == "date":
+#             properties = {
+#                 column_name: {
+#                     "type": "date",
+#                     "date": {
+#                         "start": value,
+#                         # "time_zone": "America/Sao_Paulo"
+#                     }
+#                 }
+#             }
+#         elif value_type == "text":
+#             properties = {
+#                 column_name: {
+#                     "type": "rich_text",
+#                     "rich_text": [{"type": "text", "text": {"content": value}}]
+#                 }
+#             }
+#         else:
+#             raise ValueError(f"Unsupported value type: {value_type}")
+#
+#         response = client.pages.update(page_id=task_id, properties=properties)
+#         logging.info(f"Response from Notion API: {response}")
+#         logging.info(f"Updated task '{task_id}' in Notion: {column_name} = {value}")
+#     except Exception as e:
+#         logging.error(f"Error updating task '{task_id}' in Notion", exc_info=True)
 
 
-def get_task_status(task_id):
-    page = client.pages.retrieve(page_id=task_id)
-    status_property = page["properties"].get("Status", {}).get("select")
-    if status_property:
-        return status_property.get("name")
-    return None
+# def get_task_status(task_id):
+#     page = client.pages.retrieve(page_id=task_id)
+#     status_property = page["properties"].get("Status", {}).get("select")
+#     if status_property:
+#         return status_property.get("name")
+#     return None
 
 
-def calculate_elapsed_time(start_time_str, paused_time_str):
-    start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
-    paused_time = datetime.strptime(paused_time_str, '%Y-%m-%d %H:%M:%S')
-    return paused_time - start_time
+# def calculate_elapsed_time(start_time_str, paused_time_str):
+#     start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
+#     paused_time = datetime.strptime(paused_time_str, '%Y-%m-%d %H:%M:%S')
+#     return paused_time - start_time
 
 
 def update_or_insert_task(task_id, task_name, status):
@@ -202,7 +205,7 @@ def update_or_insert_task(task_id, task_name, status):
         in_progress_tasks.add(task_id)
         if task_id in paused_tasks:
             paused_tasks.remove(task_id)
-        send_data_to_django()
+        # send_data_to_django()
 
     elif status == "Paused" and task_id not in paused_tasks:
         result = cursor.execute("SELECT start_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()
@@ -229,7 +232,7 @@ def update_or_insert_task(task_id, task_name, status):
             if task_id in in_progress_tasks:
                 in_progress_tasks.remove(task_id)
             paused_tasks.add(task_id)
-        send_data_to_django()
+        # send_data_to_django()
 
     elif status == "Done" and task_id in in_progress_tasks:
         if existing_task:
@@ -253,7 +256,7 @@ def update_or_insert_task(task_id, task_name, status):
             if task_id in in_progress_tasks:
                 in_progress_tasks.remove(task_id)
         clear_priority_in_notion(task_id)
-        send_data_to_django()
+        # send_data_to_django()
 
     elif status == "Done" and task_id in paused_tasks:
         paused_time = cursor.execute("SELECT paused_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()[0]
@@ -267,7 +270,7 @@ def update_or_insert_task(task_id, task_name, status):
         if task_id in paused_tasks:
             paused_tasks.remove(task_id)
         clear_priority_in_notion(task_id)
-        send_data_to_django()
+        # send_data_to_django()
 
     else:
         if existing_task:
@@ -275,21 +278,22 @@ def update_or_insert_task(task_id, task_name, status):
         else:
             cursor.execute("INSERT INTO tracking (task_id, task_name, status) VALUES (?, ?, ?)",
                            (task_id, task_name, status))
-        send_data_to_django()
+        # send_data_to_django()
     conn.commit()
 
-    # send_data_to_django()
+    send_data_to_django()
 
 
-def convert_iso_to_standard_format(iso_time_str):
-    dt = datetime.fromisoformat(iso_time_str)
-    return dt.strftime('%Y-%m-%d %H:%M:%S')
+# def convert_iso_to_standard_format(iso_time_str):
+#     dt = datetime.fromisoformat(iso_time_str)
+#     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 def refresh_database_id_values():
     global database_id
 
     # Refresh database_id from SQLite database
     database_id = get_database_ids()
+
 
 def fetch_data_from_notion():
     # Refresh TOKEN and database_id from SQLite
@@ -368,7 +372,7 @@ def main():
     print("Time_tracker run successfully")
 
     # Load tasks from the database
-    load_tasks_status_from_db()
+    in_progress_tasks, paused_tasks = load_tasks_status_from_db()
 
     while True:
         try:
