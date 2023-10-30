@@ -23,7 +23,7 @@ def refresh_database_id_values():
     database_id = get_database_ids()
 
 
-def fetch_data_from_notion():
+def fetch_data_from_notion(progress_paused_task_manager=None):
     # Refresh TOKEN and database_id from SQLite
     refresh_database_id_values()
 
@@ -83,7 +83,7 @@ def fetch_data_from_notion():
                         conn.commit()
 
                 # Insert or update the task in SQLite using the function
-                update_or_insert_task(task_id, task_name, status)
+                update_or_insert_task(progress_paused_task_manager,task_id, task_name, status)
 
                 # Only add the task ID to the set if its status is not "Done"
                 if status != "Done":
