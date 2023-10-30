@@ -3,22 +3,20 @@ from datetime import datetime
 from notion_client import Client
 import logging
 from send_data_from_script_to_django_app import send_data_to_django
+from convert_utilites import calculate_elapsed_time, hms_str_to_timedelta, timedelta_to_hms_str
+from get_token_database_id import TOKEN
+from tasks_utilites import update_task_in_notion, clear_priority_in_notion
 
 
 
 logger = logging.getLogger()
 
 # SQLite setup
-from convert_utilites import calculate_elapsed_time, hms_str_to_timedelta, timedelta_to_hms_str
-from get_token_database_id import TOKEN
-from tasks_utilites import update_task_in_notion, clear_priority_in_notion
-
 conn = sqlite3.connect('time_tracking.db')
 cursor = conn.cursor()
 
 # Notion connect
 client = Client(auth=TOKEN)
-
 
 in_progress_tasks = set()
 paused_tasks = set()

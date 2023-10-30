@@ -26,9 +26,3 @@ database_id = get_database_ids()
 logger.info(f"TOKEN: {TOKEN}")
 logger.info(f"database_id: {database_id}")
 
-
-# def refresh_database_id_values():
-#     global database_id
-#
-#     # Refresh database_id from SQLite database
-#     database_id = get_database_ids()
