@@ -25,8 +25,8 @@ def receive_data():
 
 
         # Get current time in GMT-3
-        sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
-        current_time = datetime.now(sao_paulo_tz)
+        # sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
+        current_time = datetime.now()
 
         #delete data from token table
         cursor.execute("DELETE FROM token")

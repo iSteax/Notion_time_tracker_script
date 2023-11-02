@@ -25,7 +25,12 @@ def send_data_to_django():
     }
 
     # Send data to Django app
-    response = requests.post('http://127.0.0.1:8000/receive_data/', json=payload)
+    Authorization =  'dlvifgsjvyf157desa'
+    headers = {
+        'Authorization': Authorization,
+    }
+
+    response = requests.post('http://127.0.0.1:8000/receive_data/', json=payload,headers=headers)
     print(response.content)
 
     # Log the response message
