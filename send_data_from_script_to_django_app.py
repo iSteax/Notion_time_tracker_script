@@ -2,8 +2,6 @@ from flask import Flask, jsonify, request
 import sqlite3
 import requests
 import logging
-from datetime import datetime
-import pytz
 
 
 logger = logging.getLogger()
