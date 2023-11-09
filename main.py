@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS tracking (
     task_id TEXT PRIMARY KEY,
     task_name TEXT,
     start_time TEXT,
+    start_time_origin TEXT,
     paused_time TEXT,
     elapsed_time TEXT,
     done_time TEXT,

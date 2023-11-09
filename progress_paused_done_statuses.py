@@ -29,6 +29,7 @@ class ProgressPausedTaskManager:
 
 def update_or_insert_task(progress_paused_task_manager,task_id, task_name, status):
     """Insert or update a task in the SQLite database."""
+
     existing_task = cursor.execute("SELECT status FROM tracking WHERE task_id=?", (task_id,)).fetchone()
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 

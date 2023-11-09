@@ -82,8 +82,8 @@ def fetch_data_from_notion(progress_paused_task_manager=None):
                             (start_time, paused_time, done_time, elapsed_time, task_id))
                         conn.commit()
 
-                # Insert or update the task in SQLite using the function
-                update_or_insert_task(progress_paused_task_manager,task_id, task_name, status)
+                    # Insert or update the task in SQLite using the function
+                    update_or_insert_task(progress_paused_task_manager,task_id, task_name, status)    #подвинул на tab внутрь и спам send data to django пропал....
 
                 # Only add the task ID to the set if its status is not "Done"
                 if status != "Done":
