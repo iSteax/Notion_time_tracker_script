@@ -40,7 +40,7 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
     if status == previous_status:
         return
 
-    if status == "In progress" and task_id not in progress_paused_task_manager.in_progress_tasks:
+    if status == "In progress":
         start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if existing_task:
             if not existing_task[1]:  # Check if start_time_origin is None or an empty string
@@ -59,7 +59,7 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
         #     progress_paused_task_manager.paused_tasks.remove(task_id)
         # send_data_to_django()
 
-    elif status == "Paused" and task_id not in progress_paused_task_manager.paused_tasks:
+    elif status == "Paused":
         result = cursor.execute("SELECT start_time, elapsed_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()
         if result:
             start_time_str, previous_elapsed_time_str = result
@@ -86,7 +86,7 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
             # progress_paused_task_manager.paused_tasks.add(task_id)
         # send_data_to_django()
 
-    elif status == "Done" and task_id in progress_paused_task_manager.in_progress_tasks:
+    elif status == "Done" and previous_status == "In progress":
         if existing_task:
             cursor.execute("UPDATE tracking SET status=?, done_time=? WHERE task_id=?", (status, now, task_id))
         else:
@@ -110,7 +110,7 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
         clear_priority_in_notion(task_id)
         # send_data_to_django()
 
-    elif status == "Done" and task_id in progress_paused_task_manager.paused_tasks:
+    elif status == "Done" and previous_status == "Paused":
         paused_time = cursor.execute("SELECT paused_time FROM tracking WHERE task_id=?", (task_id,)).fetchone()[0]
         if existing_task:
             cursor.execute("UPDATE tracking SET status=?, done_time=?, task_name=? WHERE task_id=?",
