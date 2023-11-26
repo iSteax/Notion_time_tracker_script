@@ -27,13 +27,14 @@ class ProgressPausedTaskManager:
         self.paused_tasks = set()
 
 
-def update_or_insert_task(progress_paused_task_manager,task_id, task_name, status):
+def update_or_insert_task(progress_paused_task_manager,task_id, task_name, status, start_time_origin):
     """Insert or update a task in the SQLite database."""
 
-    existing_task = cursor.execute("SELECT status FROM tracking WHERE task_id=?", (task_id,)).fetchone()
+    existing_task = cursor.execute("SELECT status, start_time_origin FROM tracking WHERE task_id=?", (task_id,)).fetchone()
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     previous_status = existing_task[0] if existing_task else None
+    # start_time_origin = existing_task[1] if existing_task else None
 
     # If the status hasn't changed, there's no need to update the elapsed time
     if status == previous_status:
@@ -41,16 +42,21 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
 
     if status == "In progress" and task_id not in progress_paused_task_manager.in_progress_tasks:
         start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        if existing_task:  # If the task already exists in the database
+        if existing_task:
+            if not existing_task[1]:  # Check if start_time_origin is None or an empty string
+                # Set the start_time_origin as this is the first "In progress" state
+                start_time_origin = start_time
+                cursor.execute("UPDATE tracking SET start_time_origin=? WHERE task_id=?", (start_time_origin, task_id))
             cursor.execute("UPDATE tracking SET status=?, start_time=?, task_name=? WHERE task_id=?",
-                           (status, start_time, task_name, task_id))
+                            (status, start_time, task_name, task_id))
         else:  # If it's a new task
-            cursor.execute("INSERT INTO tracking (task_id, task_name, status, start_time) VALUES (?, ?, ?, ?)",
-                           (task_id, task_name, status, start_time))
+            start_time_origin = start_time
+            cursor.execute("INSERT INTO tracking (task_id, task_name, status, start_time,start_time_origin) VALUES (?, ?, ?, ?, ?)",
+                        (task_id, task_name, status, start_time,start_time_origin))
         update_task_in_notion(task_id, "Start time", start_time, value_type="date")
-        progress_paused_task_manager.in_progress_tasks.add(task_id)
-        if task_id in progress_paused_task_manager.paused_tasks:
-            progress_paused_task_manager.paused_tasks.remove(task_id)
+        # progress_paused_task_manager.in_progress_tasks.add(task_id)
+        # if task_id in progress_paused_task_manager.paused_tasks:
+        #     progress_paused_task_manager.paused_tasks.remove(task_id)
         # send_data_to_django()
 
     elif status == "Paused" and task_id not in progress_paused_task_manager.paused_tasks:
@@ -75,9 +81,9 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
                            (status, now, elapsed_time_str, task_name, task_id))
             update_task_in_notion(task_id, "Elapsed time", elapsed_time_str, value_type="text")
             update_task_in_notion(task_id, "Paused time", now, value_type="date")
-            if task_id in progress_paused_task_manager.in_progress_tasks:
-                progress_paused_task_manager.in_progress_tasks.remove(task_id)
-            progress_paused_task_manager.paused_tasks.add(task_id)
+            # if task_id in progress_paused_task_manager.in_progress_tasks:
+            #     progress_paused_task_manager.in_progress_tasks.remove(task_id)
+            # progress_paused_task_manager.paused_tasks.add(task_id)
         # send_data_to_django()
 
     elif status == "Done" and task_id in progress_paused_task_manager.in_progress_tasks:
@@ -99,8 +105,8 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
                            (status, now, elapsed_time_str, task_name, task_id))
             update_task_in_notion(task_id, "Elapsed time", elapsed_time_str, value_type="text")
             update_task_in_notion(task_id, "Done time", now, value_type="date")
-            if task_id in progress_paused_task_manager.in_progress_tasks:
-                progress_paused_task_manager.in_progress_tasks.remove(task_id)
+            # if task_id in progress_paused_task_manager.in_progress_tasks:
+            #     progress_paused_task_manager.in_progress_tasks.remove(task_id)
         clear_priority_in_notion(task_id)
         # send_data_to_django()
 
@@ -113,8 +119,8 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
             cursor.execute("INSERT INTO tracking (task_id, status, done_time) VALUES (?, ?, ?)",
                            (task_id, status, paused_time))
         update_task_in_notion(task_id, "Done time", paused_time, value_type="date")
-        if task_id in progress_paused_task_manager.paused_tasks:
-            progress_paused_task_manager.paused_tasks.remove(task_id)
+        # if task_id in progress_paused_task_manager.paused_tasks:
+        #     progress_paused_task_manager.paused_tasks.remove(task_id)
         clear_priority_in_notion(task_id)
         # send_data_to_django()
 
@@ -124,7 +130,7 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
         else:
             cursor.execute("INSERT INTO tracking (task_id, task_name, status) VALUES (?, ?, ?)",
                            (task_id, task_name, status))
-        # send_data_to_django()
     conn.commit()
 
     send_data_to_django()
+

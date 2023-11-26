@@ -4,8 +4,7 @@ import logging
 from convert_utilites import convert_iso_to_standard_format
 from get_token_database_id import TOKEN, get_database_ids
 from progress_paused_done_statuses import update_or_insert_task
-
-
+from tasks_utilites import tasks_status_tracking
 
 logger = logging.getLogger()
 
@@ -23,7 +22,7 @@ def refresh_database_id_values():
     database_id = get_database_ids()
 
 
-def fetch_data_from_notion(progress_paused_task_manager=None):
+def fetch_data_from_notion(progress_paused_task_manager=None, start_time_origin=None):
     # Refresh TOKEN and database_id from SQLite
     refresh_database_id_values()
 
@@ -40,7 +39,7 @@ def fetch_data_from_notion(progress_paused_task_manager=None):
                 "title"] else None
             task_id = task["id"]
 
-            # Retrieve the status from the Notion task
+            # Retrieve the status from the Notion
             status_property = task["properties"].get("Status", {}).get("select")
             status = status_property.get("name") if status_property else None
 
@@ -83,7 +82,10 @@ def fetch_data_from_notion(progress_paused_task_manager=None):
                         conn.commit()
 
                     # Insert or update the task in SQLite using the function
-                    update_or_insert_task(progress_paused_task_manager,task_id, task_name, status)    #подвинул на tab внутрь и спам send data to django пропал....
+                    update_or_insert_task(progress_paused_task_manager,task_id, task_name, status,start_time_origin)    #подвинул на tab внутрь и спам send data to django пропал....
+                # add_remove_task_from_progress_paused_task_manager(progress_paused_task_manager, task_id, status)
+                tasks_status_tracking(task_id, status, progress_paused_task_manager)
+
 
                 # Only add the task ID to the set if its status is not "Done"
                 if status != "Done":

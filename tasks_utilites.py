@@ -86,3 +86,26 @@ def get_task_status(task_id):
         return status_property.get("name")
     return None
 
+
+def tasks_status_tracking (task_id, status, progress_paused_task_manager):
+    if status == "In progress":
+        if task_id not in progress_paused_task_manager.in_progress_tasks:
+            progress_paused_task_manager.in_progress_tasks.add(task_id)
+            progress_paused_task_manager.paused_tasks.discard(task_id)  # Safe to use discard as it won't raise an error if the item is not present
+
+    elif status == "Paused":
+        if task_id not in progress_paused_task_manager.paused_tasks:
+            progress_paused_task_manager.paused_tasks.add(task_id)
+            progress_paused_task_manager.in_progress_tasks.discard(task_id)
+
+    elif status == "Done":
+        progress_paused_task_manager.in_progress_tasks.discard(task_id)
+        progress_paused_task_manager.paused_tasks.discard(task_id)
+
+def remove_deleted_tasks_from_progress_paused_task_manager_sets (fetched_task_ids, progress_paused_task_manager):
+    progress_paused_task_manager.in_progress_tasks = {
+        task_id for task_id in progress_paused_task_manager.in_progress_tasks if task_id in fetched_task_ids
+    }
+    progress_paused_task_manager.paused_tasks = {
+        task_id for task_id in progress_paused_task_manager.paused_tasks if task_id in fetched_task_ids
+    }
