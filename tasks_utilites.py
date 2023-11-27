@@ -58,7 +58,7 @@ def update_task_in_notion(task_id, column_name, value, value_type="date"):
                     "type": "date",
                     "date": {
                         "start": value,
-                        # "time_zone": "America/Sao_Paulo"
+                        "time_zone": "America/Sao_Paulo"
                     }
                 }
             }
