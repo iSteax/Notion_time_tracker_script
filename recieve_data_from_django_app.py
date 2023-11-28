@@ -9,7 +9,6 @@ logger = logging.getLogger()
 
 app = Flask(__name__)
 
-
 @app.route('/receive_data/', methods=['GET','POST'])
 def receive_data():
     try:
@@ -55,4 +54,4 @@ def receive_data():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(host='0.0.0.0', port=5000)
