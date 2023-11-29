@@ -64,7 +64,7 @@ def update_or_insert_task(progress_paused_task_manager,task_id, task_name, statu
         if result:
             start_time_str, previous_elapsed_time_str,start_time_origin= result
         else:
-            start_time_str, previous_elapsed_time_str,start_time_origin = None, None
+            start_time_str, previous_elapsed_time_str,start_time_origin = None, None, None
 
         if start_time_str:
             current_elapsed_time = calculate_elapsed_time(start_time_str, now)
