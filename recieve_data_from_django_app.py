@@ -1,9 +1,7 @@
 from flask import Flask, jsonify, request
 import sqlite3
-import requests
 import logging
 from datetime import datetime
-import pytz
 
 logger = logging.getLogger()
 
@@ -54,4 +52,4 @@ def receive_data():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5050)
