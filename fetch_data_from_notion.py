@@ -1,4 +1,5 @@
 import sqlite3
+import notion_client
 from notion_client import Client
 import logging
 from convert_utilites import convert_iso_to_standard_format
@@ -31,8 +32,12 @@ def fetch_data_from_notion(progress_paused_task_manager=None, start_time_origin=
     fetched_task_ids = set()                                                                                    # This set will store the IDs of tasks fetched from Notion whose status is not "Done"
 
     for db_id, db_name in database_id.items():
-        logging.info(f"Fetching data from database: {db_name}")
-        tasks = client.databases.query(database_id=db_id)["results"]
+        try:
+            logging.info(f"Fetching data from database: {db_name}")
+            tasks = client.databases.query(database_id=db_id)["results"]
+        except notion_client.errors.APIResponseError as e:
+            logging.error(f"Could not fetch data from database {db_name} with ID {db_id}: {e}")
+            continue  # Skip this database and move to the next
 
         for task in tasks:
             task_name = task["properties"]["Name"]["title"][0]["text"]["content"] if task["properties"]["Name"][
