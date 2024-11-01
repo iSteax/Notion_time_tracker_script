@@ -1,0 +1,20 @@
+version: "3"
+
+networks:
+  notion-network:
+    external: true
+
+services:
+  web:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 438242400847.dkr.ecr.us-east-1.amazonaws.com/notion_script_container:28.10.24
+    ports:
+      - "5050:5050"
+    volumes:
+      - /home/ec2-user/time_tracking.db:/app/time_tracking.db
+    networks:
+      - notion-network
+

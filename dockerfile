@@ -11,6 +11,7 @@ WORKDIR /app
 
 # Copy the current directory contents into the container at /app
 COPY . /app
+COPY time_tracking.db /app/time_tracking.db
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt

@@ -9,6 +9,7 @@ from get_token_database_id import TOKEN
 from progress_paused_done_statuses import ProgressPausedTaskManager
 from tasks_utilites import load_tasks_status_from_db, remove_deleted_tasks_from_progress_paused_task_manager_sets
 
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
