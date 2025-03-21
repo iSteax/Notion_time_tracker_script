@@ -60,16 +60,12 @@ def fetch_data_from_notion(progress_paused_task_manager=None, start_time_origin=
                     db_start_time, db_paused_time, db_done_time, db_elapsed_time = existing_task
 
                     # Extract and convert the Start time
-                    start_time_data = task["properties"].get("Start time", {}).get("date")
-                    start_time = start_time_data.get("start") if start_time_data else None
-                    if start_time:
-                        start_time = convert_iso_to_standard_format(start_time)
+                    start_time_data = task["properties"].get("Start time", {}).get("rich_text", [])
+                    start_time = start_time_data[0].get("text", {}).get("content") if start_time_data else None
 
                     # Extract and convert the Paused time
-                    paused_time_data = task["properties"].get("Paused time", {}).get("date")
-                    paused_time = paused_time_data.get("start") if paused_time_data else None
-                    if paused_time:
-                        paused_time = convert_iso_to_standard_format(paused_time)
+                    paused_time_data = task["properties"].get("Paused time", {}).get("rich_text", [])
+                    paused_time = paused_time_data[0].get("text", {}).get("content") if paused_time_data else None
 
                     # Extract and convert the Done time
                     done_time_data = task["properties"].get("Done time", {}).get("date")

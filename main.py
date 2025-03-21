@@ -69,16 +69,6 @@ def main(progress_paused_task_manager):
         try:
             # Fetch tasks from Notion and get their IDs
             fetched_task_ids = fetch_data_from_notion(progress_paused_task_manager)
-            #
-            # # Get all task IDs from the SQLite database
-            # all_db_task_ids = {task[0] for task in cursor.execute("SELECT task_id FROM tracking").fetchall()}
-            #
-            # # Find tasks that are in the SQLite database but not in the fetched tasks from Notion
-            # deleted_task_ids = all_db_task_ids - fetched_task_ids
-            #
-            # # Remove deleted tasks' IDs from the in_progress_tasks and paused_tasks sets
-            # progress_paused_task_manager.in_progress_tasks -= deleted_task_ids
-            # progress_paused_task_manager.paused_tasks -= deleted_task_ids
 
             # Remove deleted tasks from the tracking sets
             remove_deleted_tasks_from_progress_paused_task_manager_sets(fetched_task_ids, progress_paused_task_manager)

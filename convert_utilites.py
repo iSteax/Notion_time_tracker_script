@@ -20,11 +20,16 @@ def hms_str_to_timedelta(hms_str):
 
 
 def calculate_elapsed_time(start_time_str, paused_time_str):
-    start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
-    paused_time = datetime.strptime(paused_time_str, '%Y-%m-%d %H:%M:%S')
+    start_time = datetime.strptime(start_time_str, '%d/%m/%Y %H:%M:%S')
+    paused_time = datetime.strptime(paused_time_str, '%d/%m/%Y %H:%M:%S')
     return paused_time - start_time
 
 
 def convert_iso_to_standard_format(iso_time_str):
     dt = datetime.fromisoformat(iso_time_str)
-    return dt.strftime('%Y-%m-%d %H:%M:%S')
+    return dt.strftime('%d/%m/%Y %H:%M:%S')
+
+
+def convert_text_to_iso(date_str):
+    dt = datetime.strptime(date_str, '%d/%m/%Y %H:%M:%S')
+    return dt.isoformat()
