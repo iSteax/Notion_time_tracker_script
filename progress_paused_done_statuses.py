@@ -3,7 +3,8 @@ from datetime import datetime
 from notion_client import Client
 import logging
 from send_data_from_script_to_django_app import send_data_to_django
-from convert_utilites import calculate_elapsed_time, hms_str_to_timedelta, timedelta_to_hms_str, convert_text_to_iso
+from convert_utilites import (calculate_elapsed_time, hms_str_to_timedelta, timedelta_to_hms_str,
+      convert_text_to_iso, remove_seconds_for_notion, get_last_full_timestamp_from_db)
 from get_token_database_id import TOKEN
 from tasks_utilites import update_task_in_notion, clear_priority_in_notion
 
@@ -64,7 +65,7 @@ def update_or_insert_task(progress_paused_task_manager, task_id, task_name, stat
                 (task_id, task_name, status, new_start_time_value, start_time_origin)
             )
         # Update Notion's "Start time" with the concatenated start times.
-        update_task_in_notion(task_id, "Start time", new_start_time_value, value_type="text")
+        update_task_in_notion(task_id, "Start time", remove_seconds_for_notion(new_start_time_value), value_type="text")
 
     elif status == "Paused":
         result = cursor.execute(
@@ -78,7 +79,7 @@ def update_or_insert_task(progress_paused_task_manager, task_id, task_name, stat
 
         if start_time_str:
             # Use the last start time from the multi-line field for the current pause period
-            latest_start_time = start_time_str.split('\n')[-1]
+            latest_start_time = get_last_full_timestamp_from_db(start_time_str)
             current_elapsed_time = calculate_elapsed_time(latest_start_time, now)
             logging.info(f"Current Elapsed Time: {current_elapsed_time}")
             if previous_elapsed_time_str:
@@ -102,12 +103,12 @@ def update_or_insert_task(progress_paused_task_manager, task_id, task_name, stat
         # Ensure we send a string (or empty string) for elapsed time
         update_task_in_notion(task_id, "Elapsed time", elapsed_time_str if elapsed_time_str is not None else "", value_type="text")
         # For multi-line paused times, Notion property must be text.
-        update_task_in_notion(task_id, "Paused time", new_paused_time_value, value_type="text")
+        update_task_in_notion(task_id, "Paused time", remove_seconds_for_notion(new_paused_time_value), value_type="text")
         # Preserve the full multi-line start_time in Notion.
         if start_time_str:
-            update_task_in_notion(task_id, "Start time", start_time_str, value_type="text")
+            update_task_in_notion(task_id, "Start time", remove_seconds_for_notion(start_time_str), value_type="text")
         elif start_time_origin:
-            update_task_in_notion(task_id, "Start time", start_time_origin, value_type="text")
+            update_task_in_notion(task_id, "Start time", remove_seconds_for_notion(start_time_origin), value_type="text")
 
     elif status == "Done" and previous_status == "In progress":
         if existing_task:
